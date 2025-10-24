@@ -5,6 +5,7 @@ import requests
 import boto3
 from ydata_profiling import ProfileReport
 from streamlit_pandas_profiling import st_profile_report
+import time
 
 st.set_page_config(page_title="DataProfilingApp", layout="wide")
 # Web App Title
@@ -25,9 +26,13 @@ if "pr" not in st.session_state:
 if "uploaded" not in st.session_state:
     st.session_state["uploaded"] = False
 if "uploaded_file_name" not in st.session_state:
-    st.session_state["uploadedfile_name"] = None
+    st.session_state["uploaded_file_name"] = None
 if "df" not in st.session_state:
     st.session_state["df"] = None
+if "chunked" not in st.session_state:
+    st.session_state["chunked"] = False
+if "report_gen_time" not in st.session_state:
+    st.session_state["report_gen_time"] = None
 
 
 st.sidebar.header("📂 Data Source Selection")
@@ -48,11 +53,13 @@ if data_source == "Upload CSV":
     if uploaded_file is not None:
         st.session_state["df"] = pd.read_csv(uploaded_file)
         st.sidebar.success(f"✅ Loaded: {uploaded_file.name}")
+        st.session_state["uploaded_file_name"] = st.sidebar.text_input("Enter A Data Report Name")
 
 # ---------------------------------------------------
 # 2️⃣  GitHub
 # ---------------------------------------------------
 elif data_source == "GitHub":
+
     github_url = st.sidebar.text_input("Enter GitHub CSV URL")
 
     if github_url:
@@ -70,6 +77,8 @@ elif data_source == "GitHub":
             r = requests.get(github_url, headers=headers)
             r.raise_for_status()
             st.session_state["df"] = pd.read_csv(io.StringIO(r.text))
+            # Report File Saving Name
+            st.session_state["uploaded_file_name"] = st.sidebar.text_input("Enter A Data Report Name")
             st.sidebar.success("✅ Data loaded from GitHub")
         except Exception as e:
             st.sidebar.error(f"❌ Error: {e}")
@@ -86,6 +95,7 @@ elif data_source == "Google Drive":
             file_id = drive_url.split("/d/")[1].split("/")[0]
             csv_url = f"https://drive.google.com/uc?id={file_id}"
             st.session_state["df"] = pd.read_csv(csv_url)
+            st.session_state["uploaded_file_name"] = st.sidebar.text_input("Enter A Data Report Name")
             st.sidebar.success("✅ Data loaded from Google Drive (public)")
         except Exception as e:
             st.sidebar.error(f"❌ Error: {e}")
@@ -109,7 +119,7 @@ elif data_source == "AWS S3":
             )
             obj = s3.get_object(Bucket=s3_bucket, Key=s3_key)
             st.session_state["df"] = pd.read_csv(io.BytesIO(obj["Body"].read()))
-
+            st.session_state["uploaded_file_name"] = st.sidebar.text_input("Enter A Data Report Name")
             st.sidebar.success("✅ Data loaded from S3")
         except Exception as e:
             st.sidebar.error(f"❌ Error: {e}")
@@ -122,30 +132,43 @@ def profile_report_gen(df, explorative=True):
     pr = ProfileReport(df, explorative=explorative)
     return pr
 
-@st.cache_data
-def load_csv():
-    csv = pd.read_csv(uploaded_file, nrows=5000)
-    return csv
 
 # Show Report If Data 
 if st.session_state["df"] is not None:
+    # df = st.session_state["df"].copy()
     st.success("Data Loaded Successfully ✅")
-    st.write(f"**Rows:** {len(df)} | **Columns:** {len(df.columns)}")
-    st.dataframe(df.head())
+    st.write(f"**Rows:** {len(st.session_state["df"])} | **Columns:** {len(st.session_state["df"].columns)}")
     # Pandas Profiling Report
     st.session_state["uploaded"] = True
-    df = load_csv()
+    chunk_size = 5000
     if st.sidebar.button("Generate Data Report", 
     disabled=not st.session_state["uploaded"], width="stretch"):
-        pr = profile_report_gen(df, explorative=True)
+        if st.session_state["df"].shape[0] > chunk_size:
+            st.session_state["chunked"] = True
+            df_chunk = st.session_state["df"][:chunk_size]
+        else:
+            df_chunk = st.session_state["df"].copy()
+        
+        pr = profile_report_gen(df_chunk, explorative=True)
+        
         st.session_state["pr"] = pr
 
-    st.header('**Input DataFrame**')
-    st.write(df)
+    st.header('**Input DataFrame: Top 10 Rows**')
+    st.write(st.session_state["df"].head(10))
     st.write('---')
     if st.session_state["pr"]:
         st.header('**Pandas Profiling Report**')
+        if st.session_state["chunked"]:
+            st.warning(f"Found Large Dataset of {st.session_state["df"].shape[0]} rows")
+            st.markdown(f"*Chunked*: _{st.session_state["chunked"]}_ - __Top {chunk_size} rows__")
+        else:
+            st.markdown(f"Using Full DataFrame: _{st.session_state["df"].shape[0]}_ rows")
+        start_time = time.time()
         st_profile_report(st.session_state["pr"])
+        elapsed_time = time.time() - start_time
+        st.session_state["report_gen_time"] = elapsed_time
+        
+        st.markdown(f"__Time Taken to generate report__: _{st.session_state["report_gen_time"]} seconds_")
     # Create HTML report in-memory
     if st.session_state["pr"]:
         html_report = st.session_state["pr"].to_html()
