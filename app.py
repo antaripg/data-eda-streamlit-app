@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 #from pandas_profiling import ProfileReport
-from ydata_profiling import ProfileReport
+from data_profiling import ProfileReport
 from streamlit_pandas_profiling import st_profile_report
 
 # Web App Title
@@ -52,7 +52,7 @@ if uploaded_file is not None:
     st.write(df)
     st.write('---')
     if st.session_state["pr"]:
-        st.header('**Pandas Profiling Report**')
+        st.header('**Data Report**')
         st_profile_report(st.session_state["pr"])
     # Create HTML report in-memory
     if st.session_state["pr"]:
