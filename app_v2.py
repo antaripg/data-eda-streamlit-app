@@ -3,8 +3,8 @@ import pandas as pd
 import io
 import requests
 import boto3
-from ydata_profiling import ProfileReport
-from streamlit_pandas_profiling import st_profile_report
+from data_profiling import ProfileReport
+# from streamlit_pandas_profiling import st_profile_report
 import time
 
 st.set_page_config(page_title="DataProfilingApp", layout="wide")
@@ -163,12 +163,12 @@ if st.session_state["df"] is not None:
             st.markdown(f"*Chunked*: _{st.session_state["chunked"]}_ - __Top {chunk_size} rows__")
         else:
             st.markdown(f"Using Full DataFrame: _{st.session_state["df"].shape[0]}_ rows")
-        start_time = time.time()
-        st_profile_report(st.session_state["pr"])
-        elapsed_time = time.time() - start_time
-        st.session_state["report_gen_time"] = elapsed_time
+        # start_time = time.time()
+        # # st_profile_report(st.session_state["pr"])
+        # elapsed_time = time.time() - start_time
+        # st.session_state["report_gen_time"] = elapsed_time
         
-        st.markdown(f"__Time Taken to generate report__: _{st.session_state["report_gen_time"]} seconds_")
+        # st.markdown(f"__Time Taken to generate report__: _{st.session_state["report_gen_time"]} seconds_")
     # Create HTML report in-memory
     if st.session_state["pr"]:
         html_report = st.session_state["pr"].to_html()
